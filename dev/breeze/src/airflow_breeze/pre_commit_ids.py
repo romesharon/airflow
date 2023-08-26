@@ -111,8 +111,6 @@ PRE_COMMIT_LIST = [
     "python-no-log-warn",
     "replace-bad-characters",
     "rst-backticks",
-    "ruff",
-    "ruff-format",
     "shellcheck",
     "trailing-whitespace",
     "ts-compile-format-lint-www",
@@ -133,5 +131,6 @@ PRE_COMMIT_LIST = [
     "update-supported-versions",
     "update-vendored-in-k8s-json-schema",
     "update-version",
+    "validate-operators-init",
     "yamllint",
 ]
