@@ -632,14 +632,14 @@ server_tls_key_file = /etc/pgbouncer/server.key
   {{- end }}
 {{- end }}
 
-{{/* Create the name of the cleanup service account to use */}}
-{{- define "cleanup.serviceAccountName" -}}
-  {{- if .Values.cleanup.serviceAccount.create }}
-    {{- default (printf "%s-cleanup" (include "airflow.serviceAccountName" .)) .Values.cleanup.serviceAccount.name }}
-  {{- else }}
-    {{- default "default" .Values.cleanup.serviceAccount.name }}
-  {{- end }}
-{{- end }}
+# {{/* Create the name of the cleanup service account to use */}}
+# {{- define "cleanup.serviceAccountName" -}}
+#   {{- if .Values.cleanup.serviceAccount.create }}
+#     {{- default (printf "%s-cleanup" (include "airflow.serviceAccountName" .)) .Values.cleanup.serviceAccount.name }}
+#   {{- else }}
+#     {{- default "default" .Values.cleanup.serviceAccount.name }}
+#   {{- end }}
+# {{- end }}
 
 {{- define "wait-for-migrations-command" -}}
   {{- if semverCompare ">=2.0.0" .Values.airflowVersion }}

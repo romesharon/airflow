@@ -2151,7 +2151,7 @@ scheduler:
       version_added: ~
       type: string
       example: ~
-      default: "{AIRFLOW_HOME}/logs/scheduler"
+      default: "{AIRFLOW_HOME}/logs"
     scheduler_zombie_task_threshold:
       description: |
         Local task jobs periodically heartbeat to the DB. If the job has

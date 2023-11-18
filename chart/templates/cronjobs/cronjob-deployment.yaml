@@ -1,0 +1,113 @@
+{{/*
+ Licensed to the Apache Software Foundation (ASF) under one
+ or more contributor license agreements.  See the NOTICE file
+ distributed with this work for additional information
+ regarding copyright ownership.  The ASF licenses this file
+ to you under the Apache License, Version 2.0 (the
+ "License"); you may not use this file except in compliance
+ with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing,
+ software distributed under the License is distributed on an
+ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ KIND, either express or implied.  See the License for the
+ specific language governing permissions and limitations
+ under the License.
+*/}}
+
+################################
+## Airflow Pods CronJob
+#################################
+{{- range $cronJobName, $cronJobProperties := .Values.cronjobs }}
+{{- if $cronJobProperties.enabled }}
+{{- $nodeSelector := or $cronJobProperties.nodeSelector .Values.nodeSelector }}
+{{- $affinity := or $cronJobProperties.affinity .Values.affinity }}
+{{- $tolerations := or $cronJobProperties.tolerations .Values.tolerations }}
+{{- $topologySpreadConstraints := or $cronJobProperties.topologySpreadConstraints .Values.topologySpreadConstraints }}
+{{- $securityContext := include "airflowPodSecurityContext" (list . $cronJobProperties) }}
+{{- $containerSecurityContext := include "containerSecurityContext" (list . $cronJobProperties) }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "airflow.fullname" . }}-$cronJobName
+  labels:
+    tier: airflow
+    component: airflow-{{ $cronJobName }}-pods
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    {{- with .Values.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $cronJobProperties.jobAnnotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: "{{ tpl $cronJobProperties.schedule . }}"
+  # The cron job does not allow concurrent runs; if it is time for a new job run and the previous job run hasn't finished yet, the cron job skips the new job run
+  concurrencyPolicy: Forbid
+  {{- if $cronJobProperties.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $cronJobProperties.failedJobsHistoryLimit }}
+  {{- end }}
+  {{- if $cronJobProperties.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ $cronJobProperties.successfulJobsHistoryLimit }}
+  {{- end }}
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            tier: airflow
+            component: airflow-{{ $cronJobName }}
+            release: {{ .Release.Name }}
+            {{- if or (.Values.labels) ($cronJobProperties.labels) }}
+              {{- mustMerge $cronJobProperties.labels .Values.labels | toYaml | nindent 12 }}
+            {{- end }}
+          annotations:
+            sidecar.istio.io/inject: "false"
+            {{- if .Values.airflowPodAnnotations }}
+              {{- toYaml .Values.airflowPodAnnotations | nindent 12 }}
+            {{- end }}
+            {{- if $cronJobProperties.podAnnotations }}
+              {{- toYaml $cronJobProperties.podAnnotations | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: Never
+          nodeSelector: {{- toYaml $nodeSelector | nindent 12 }}
+          affinity: {{- toYaml $affinity | nindent 12 }}
+          {{- if .Values.schedulerName }}
+          schedulerName: {{ .Values.schedulerName }}
+          {{- end }}
+          tolerations: {{- toYaml $tolerations | nindent 12 }}
+          topologySpreadConstraints: {{- toYaml $topologySpreadConstraints | nindent 12 }}
+          serviceAccountName: {{ include "airflow.serviceAccountName" . }}-{{ $cronJobProperties.serviceAccount.name }}
+          {{- if or .Values.registry.secretName .Values.registry.connection }}
+          imagePullSecrets:
+            - name: {{ template "registry_secret" . }}
+          {{- end }}
+          securityContext: {{ $securityContext | nindent 12 }}
+          containers:
+            - name: airflow-{{ $cronJobName }}-pods
+              image: {{ template "airflow_image" . }}
+              imagePullPolicy: {{ .Values.images.airflow.pullPolicy }}
+              securityContext: {{ $containerSecurityContext | nindent 16 }}
+              {{- if $cronJobProperties.command }}
+              command: {{ tpl (toYaml $cronJobProperties.command) . | nindent 16 }}
+              {{- end }}
+              {{- if $cronJobProperties.args }}
+              args: {{ tpl (toYaml $cronJobProperties.args) . | nindent 16 }}
+              {{- end }}
+              env:
+                {{- include "standard_airflow_environment" . | indent 12 }}
+                {{- include "container_extra_envs" (list . $cronJobProperties.env) | indent 12 }}
+              volumeMounts: {{- include "airflow_config_mount" . | nindent 16 }}
+              resources: {{- toYaml $cronJobProperties.resources | nindent 16 }}
+          volumes:
+            - name: config
+              configMap:
+                name: {{ template "airflow_config" . }}
+{{- end }}
+{{- end }}
